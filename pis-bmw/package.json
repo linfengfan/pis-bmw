@@ -1,0 +1,26 @@
+{
+  "name": "load-pdf",
+  "version": "1.0.0",
+  "description": "将 PDF 高保真还原为 Markdown，保留表格、标题、脚注、数学公式",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "server": "tsx src/server.ts",
+    "build": "tsup src/cli.ts src/server.ts --format esm --dts",
+    "convert": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^10.0.0",
+    "@fastify/static": "^9.1.1",
+    "commander": "^12.1.0",
+    "fastify": "^5.2.1",
+    "pdfjs-dist": "^4.9.155",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

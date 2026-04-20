@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF → Markdown</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --border-active: #5b6af0;
+      --text: #e8eaf6;
+      --text-muted: #7b82a8;
+      --accent: #5b6af0;
+      --accent-hover: #6e7df7;
+      --success: #22c55e;
+      --error: #f87171;
+      --radius: 10px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header .logo {
+      width: 32px; height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+
+    header h1 {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    header span {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    /* ── Layout ── */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 0;
+      overflow: hidden;
+      height: calc(100vh - 65px);
+    }
+
+    /* ── Left panel ── */
+    .panel-left {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-left .inner {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Tab ── */
+    .tabs {
+      display: flex;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 7px 12px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .tab-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 4px #0004;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(91, 106, 240, 0.05);
+    }
+
+    .drop-zone .icon {
+      font-size: 32px;
+      opacity: .7;
+    }
+
+    .drop-zone p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .drop-zone strong {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .drop-zone small {
+      font-size: 12px;
+      color: var(--text-muted);
+      opacity: .7;
+    }
+
+    #file-input { display: none; }
+
+    /* 已选文件预览 */
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+
+    .file-selected.show { display: flex; }
+
+    .file-selected .file-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .file-selected .file-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-selected .file-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-selected .file-size {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .file-selected .clear-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 4px;
+      line-height: 1;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .file-selected .clear-btn:hover { color: var(--error); }
+
+    /* ── URL input ── */
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+
+    .url-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .url-input:focus {
+      border-color: var(--accent);
+    }
+
+    .url-input::placeholder { color: var(--text-muted); opacity: .6; }
+
+    /* ── Strategy select ── */
+    .strategy-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .strategy-row label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .strategy-opts {
+      display: flex;
+      gap: 6px;
+    }
+
+    .strategy-btn {
+      flex: 1;
+      padding: 7px 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+    }
+
+    .strategy-btn.active {
+      background: rgba(91, 106, 240, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ── Convert button ── */
+    .convert-btn {
+      width: 100%;
+      padding: 11px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .convert-btn:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .convert-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-wrap.show { display: flex; }
+
+    .progress-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .progress-bar-bg {
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+      transition: width .3s;
+    }
+
+    .progress-bar.indeterminate {
+      width: 40%;
+      animation: indeterminate 1.2s ease-in-out infinite;
+    }
+
+    @keyframes indeterminate {
+      0%   { transform: translateX(-150%); }
+      100% { transform: translateX(350%); }
+    }
+
+    /* ── 已保存提示 ── */
+    .saved-hint {
+      display: none;
+      font-size: 12px;
+      color: var(--success);
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: 7px;
+      padding: 8px 12px;
+    }
+
+    .saved-hint.show { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Meta badges ── */
+    .meta-row {
+      display: none;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .meta-row.show { display: flex; }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .badge .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+
+    .dot-blue  { background: #5b6af0; }
+    .dot-green { background: #22c55e; }
+    .dot-amber { background: #f59e0b; }
+    .dot-pink  { background: #ec4899; }
+    .dot-cyan  { background: #06b6d4; }
+
+    /* ── Error ── */
+    .error-msg {
+      display: none;
+      padding: 10px 14px;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--error);
+    }
+
+    .error-msg.show { display: block; }
+
+    /* ── Right panel ── */
+    .panel-right {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .output-toolbar {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .output-toolbar .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .output-toolbar .title .count {
+      font-size: 11px;
+      padding: 2px 7px;
+      background: var(--surface2);
+      border-radius: 10px;
+      color: var(--text-muted);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .action-btn:hover { border-color: var(--accent); color: var(--text); }
+    .action-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .action-btn.copied { color: var(--success); border-color: var(--success); }
+
+    .output-area {
+      flex: 1;
+      overflow: auto;
+    }
+
+    #output {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      padding: 20px;
+      white-space: pre;
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .empty-state.hidden { display: none; }
+
+    .empty-state .empty-icon {
+      font-size: 48px;
+      opacity: .3;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      opacity: .6;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: calc(100vh - 65px);
+      }
+
+      .panel-left {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-right { min-height: 400px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">📄</div>
+    <h1>PDF → Markdown<span>高保真转换工具</span></h1>
+  </header>
+
+  <div class="main">
+    <!-- ── 左侧控制面板 ── -->
+    <div class="panel-left">
+      <div class="inner">
+        <!-- Tab 切换 -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="local">本地文件</button>
+          <button class="tab-btn" data-tab="url">远程 URL</button>
+        </div>
+
+        <!-- 本地文件 Tab -->
+        <div class="tab-panel active" id="tab-local">
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" id="file-input" accept=".pdf,application/pdf" />
+            <div class="icon">📂</div>
+            <p><strong>点击选择</strong> 或拖拽 PDF 文件到此处</p>
+            <small>支持最大 100MB</small>
+          </div>
+
+          <div class="file-selected" id="file-selected">
+            <span class="file-icon">📄</span>
+            <div class="file-info">
+              <div class="file-name" id="file-name"></div>
+              <div class="file-size" id="file-size"></div>
+            </div>
+            <button class="clear-btn" id="clear-file" title="移除文件">✕</button>
+          </div>
+        </div>
+
+        <!-- 远程 URL Tab -->
+        <div class="tab-panel" id="tab-url">
+          <div class="input-group">
+            <label>PDF 链接</label>
+            <input
+              type="url"
+              class="url-input"
+              id="url-input"
+              placeholder="https://example.com/document.pdf"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+        </div>
+
+        <!-- 表格检测策略 -->
+        <div class="strategy-row">
+          <label>表格检测策略</label>
+          <div class="strategy-opts">
+            <button class="strategy-btn active" data-strategy="auto">
+              自动
+            </button>
+            <button class="strategy-btn" data-strategy="line">
+              线条（有边框）
+            </button>
+            <button class="strategy-btn" data-strategy="text">
+              对齐（无边框）
+            </button>
+          </div>
+        </div>
+
+        <!-- 错误信息 -->
+        <div class="error-msg" id="error-msg"></div>
+
+        <!-- 进度 -->
+        <div class="progress-wrap" id="progress-wrap">
+          <div class="progress-label">
+            <span id="progress-text">处理中...</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar indeterminate" id="progress-bar"></div>
+          </div>
+        </div>
+
+        <!-- 转换按钮 -->
+        <button class="convert-btn" id="convert-btn" disabled>
+          <span id="btn-icon">⚡</span>
+          <span id="btn-text">开始转换</span>
+        </button>
+
+        <!-- 统计 badges -->
+        <div class="meta-row" id="meta-row">
+          <div class="badge"><span class="dot dot-blue"></span><span id="m-pages">-</span> 页</div>
+          <div class="badge"><span class="dot dot-green"></span><span id="m-tables">-</span> 表格</div>
+          <div class="badge"><span class="dot dot-amber"></span><span id="m-headings">-</span> 标题</div>
+          <div class="badge"><span class="dot dot-pink"></span><span id="m-images">-</span> 图片</div>
+          <div class="badge"><span class="dot dot-cyan"></span><span id="m-footnotes">-</span> 脚注</div>
+        </div>
+
+        <!-- 已保存提示 -->
+        <div class="saved-hint" id="saved-hint"></div>
+      </div>
+    </div>
+
+    <!-- ── 右侧输出区域 ── -->
+    <div class="panel-right">
+      <div class="output-toolbar">
+        <div class="title">
+          Markdown 输出
+          <span class="count" id="char-count">0 字符</span>
+        </div>
+        <div class="toolbar-actions">
+          <button class="action-btn" id="copy-btn" disabled>
+            <span>复制</span>
+          </button>
+          <button class="action-btn" id="download-btn" disabled>
+            <span>下载 .md</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="output-area" id="output-area">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">✦</div>
+          <p>转换结果将在这里显示</p>
+        </div>
+        <textarea id="output" spellcheck="false" style="display:none"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────
+    // 状态
+    // ─────────────────────────────────────────────
+    const state = {
+      tab: 'local',
+      file: null,
+      url: '',
+      strategy: 'auto',
+      loading: false,
+      result: '',
+      filename: 'output',
+    };
+
+    // ─────────────────────────────────────────────
+    // DOM 引用
+    // ─────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+
+    const dropZone   = $('drop-zone');
+    const fileInput  = $('file-input');
+    const fileSelected = $('file-selected');
+    const fileName   = $('file-name');
+    const fileSize   = $('file-size');
+    const clearFile  = $('clear-file');
+    const urlInput   = $('url-input');
+    const convertBtn = $('convert-btn');
+    const btnText    = $('btn-text');
+    const btnIcon    = $('btn-icon');
+    const progressWrap = $('progress-wrap');
+    const progressText = $('progress-text');
+    const progressBar  = $('progress-bar');
+    const errorMsg   = $('error-msg');
+    const metaRow    = $('meta-row');
+    const output     = $('output');
+    const emptyState = $('empty-state');
+    const copyBtn    = $('copy-btn');
+    const downloadBtn = $('download-btn');
+    const charCount  = $('char-count');
+
+    // ─────────────────────────────────────────────
+    // Tab 切换
+    // ─────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        $(`tab-${state.tab}`).classList.add('active');
+        updateConvertBtn();
+        hideError();
+      });
+    });
+
+    // ─────────────────────────────────────────────
+    // 策略选择
+    // ─────────────────────────────────────────────
+    document.querySelectorAll('.strategy-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.strategy = btn.dataset.strategy;
+        document.querySelectorAll('.strategy-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // ─────────────────────────────────────────────
+    // 文件选择 / 拖拽
+    // ─────────────────────────────────────────────
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.[0]) setFile(fileInput.files[0]);
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer?.files?.[0];
+      if (file) setFile(file);
+    });
+
+    clearFile.addEventListener('click', () => {
+      state.file = null;
+      fileInput.value = '';
+      fileSelected.classList.remove('show');
+      dropZone.style.display = '';
+      updateConvertBtn();
+    });
+
+    function setFile(file) {
+      if (!file.name.endsWith('.pdf') && file.type !== 'application/pdf') {
+        showError('请选择 PDF 文件');
+        return;
+      }
+      state.file = file;
+      state.filename = file.name.replace(/\.pdf$/i, '');
+      fileName.textContent = file.name;
+      fileSize.textContent = formatSize(file.size);
+      fileSelected.classList.add('show');
+      dropZone.style.display = 'none';
+      hideError();
+      updateConvertBtn();
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    // ─────────────────────────────────────────────
+    // URL 输入
+    // ─────────────────────────────────────────────
+    urlInput.addEventListener('input', () => {
+      state.url = urlInput.value.trim();
+      updateConvertBtn();
+      hideError();
+    });
+
+    // ─────────────────────────────────────────────
+    // 转换按钮状态
+    // ─────────────────────────────────────────────
+    function updateConvertBtn() {
+      const ready = state.tab === 'local' ? !!state.file : !!state.url;
+      convertBtn.disabled = !ready || state.loading;
+    }
+
+    // ─────────────────────────────────────────────
+    // 转换执行
+    // ─────────────────────────────────────────────
+    convertBtn.addEventListener('click', doConvert);
+
+    async function doConvert() {
+      hideError();
+      setLoading(true);
+
+      try {
+        let data;
+        if (state.tab === 'local') {
+          // 本地文件上传
+          progressText.textContent = '上传并解析 PDF...';
+          const form = new FormData();
+          form.append('file', state.file);
+          const res = await fetch(`/convert?strategy=${state.strategy}`, {
+            method: 'POST',
+            body: form,
+          });
+          data = await res.json();
+          if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        } else {
+          // 远程 URL
+          progressText.textContent = '下载并解析远程 PDF...';
+          const res = await fetch('/convert-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: state.url, strategy: state.strategy }),
+          });
+          data = await res.json();
+          if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+}
+
+        setResult(data.markdown, data.meta, data.filename);
+      } catch (err) {
+        showError(err.message || '转换失败，请重试');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // UI 状态更新
+    // ─────────────────────────────────────────────
+    function setLoading(on) {
+      state.loading = on;
+      convertBtn.disabled = on;
+      btnText.textContent = on ? '转换中...' : '开始转换';
+      btnIcon.textContent = on ? '⏳' : '⚡';
+      progressWrap.classList.toggle('show', on);
+      if (!on) progressBar.classList.add('indeterminate');
+    }
+
+    function setResult(markdown, meta, filename) {
+      state.result = markdown;
+      state.filename = filename || state.filename;
+      output.value = markdown;
+      output.style.display = 'block';
+      emptyState.classList.add('hidden');
+      charCount.textContent = `${markdown.length.toLocaleString()} 字符`;
+
+      // 更新 meta badges
+      $('m-pages').textContent    = meta.pages;
+      $('m-tables').textContent   = meta.tables;
+      $('m-headings').textContent = meta.headings;
+      $('m-images').textContent   = meta.images;
+      $('m-footnotes').textContent = meta.footnotes;
+      metaRow.classList.add('show');
+
+      // 已保存提示
+      const hint = $('saved-hint');
+      hint.innerHTML = `✓ 已保存至 <code style="opacity:.8">ConvertedMarkdown/${state.filename}</code>`;
+      hint.classList.add('show');
+
+      copyBtn.disabled = false;
+      downloadBtn.disabled = false;
+    }
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.add('show');
+    }
+
+    function hideError() {
+      errorMsg.classList.remove('show');
+    }
+
+    // ─────────────────────────────────────────────
+    // 复制
+    // ─────────────────────────────────────────────
+    copyBtn.addEventListener('click', async () => {
+      if (!state.result) return;
+      try {
+        await navigator.clipboard.writeText(state.result);
+        copyBtn.classList.add('copied');
+        copyBtn.querySelector('span').textContent = '已复制 ✓';
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.querySelector('span').textContent = '复制';
+        }, 2000);
+      } catch {
+        // 降级：选中文本
+        output.select();
+        document.execCommand('copy');
+      }
+    });
+
+    // ─────────────────────────────────────────────
+    // 下载
+    // ─────────────────────────────────────────────
+    downloadBtn.addEventListener('click', () => {
+      if (!state.result) return;
+      const blob = new Blob([state.result], { type: 'text/markdown;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${state.filename}.md`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // ─────────────────────────────────────────────
+    // 全局粘贴 PDF（Ctrl+V）
+    // ─────────────────────────────────────────────
+    document.addEventListener('paste', (e) => {
+      const file = e.clipboardData?.files?.[0];
+      if (file?.type === 'application/pdf' || file?.name?.endsWith('.pdf')) {
+        // 自动切换到本地文件 Tab
+        if (state.tab !== 'local') {
+          document.querySelector('[data-tab="local"]').click();
+        }
+        setFile(file);
+      }
+    });
+  </script>
+</body>
+</html>
