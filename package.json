@@ -4,8 +4,8 @@
   "description": "将 PDF 高保真还原为 Markdown，保留表格、标题、脚注、数学公式",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/cli.ts",
-    "server": "tsx src/server.ts",
+    "server": "tsx src/cli.ts",
+    "dev": "tsx src/server.ts",
     "build": "tsup src/cli.ts src/server.ts --format esm --dts",
     "convert": "tsx src/cli.ts"
   },
