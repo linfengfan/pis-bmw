@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "updated": "2026/04/29",
+  "description": "pis-bmw 项目专属 Skills 索引",
+  "skills": {
+    "pdf-convert": "1.0.0"
+  },
+  "skillList": [
+    {
+      "id": "pdf-convert",
+      "name": "PDF 转换 SOP",
+      "description": "当用户要求将 PDF 转换为 Markdown，或执行文档转换任务时触发",
+      "version": "1.0.0",
+      "file": "skills/pdf-convert.md",
+      "trigger": ["PDF 转换", "转换 PDF", "PDF 转 Markdown", "convert PDF"]
+    }
+  ]
+}

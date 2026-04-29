@@ -1,0 +1,39 @@
+# MCP (Model Context Protocol) 插件配置
+
+> 本项目的 AI 协作层插件配置
+> 用于增强 Claude 的工具能力
+
+## 配置说明
+
+此文件定义项目级 MCP 服务器，这些工具会在当前项目上下文中自动可用。
+
+## 当前配置
+
+```json
+{
+  "mcpServers": {}
+}
+```
+
+## 可用 MCP 服务器
+
+| 服务器 | 用途 | 配置示例 |
+|--------|------|---------|
+| `filesystem` | 文件系统操作 | 已集成在 Claude Core |
+| `github` | GitHub API 操作 | 需添加 token |
+| `slack` | Slack 消息发送 | 需添加 webhook |
+| `puppeteer` | 浏览器自动化 | 适合测试 |
+| `sqlite` | 数据库操作 | 适合查询向量库 |
+
+## 添加新的 MCP 服务器
+
+```bash
+# 通过 Claude Code 添加
+claude mcp add <server-name> -- <command> [args]
+```
+
+## 最佳实践
+
+1. **敏感信息**: 使用环境变量而非硬编码
+2. **权限控制**: 仅添加项目必需的工具
+3. **文档化**: 在此文件顶部注释每个工具的用途
