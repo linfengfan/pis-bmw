@@ -2,7 +2,7 @@
 // Pipeline Facade：编排 extract → analyze → render
 // 各阶段之间传递不可变数据，互不依赖
 
-import type { ConvertMeta, DocumentBlock, TableStrategy } from './domain/types.js';
+import type { ConvertMeta, DocumentBlock, TableStrategy, TextItem } from './domain/types.js';
 import { extractPdf } from './extractors/pdf-extractor.js';
 import { detectTables } from './analyzers/table-analyzer.js';
 import { computeBaseFontSize, detectHeadings } from './analyzers/heading-analyzer.js';
@@ -174,13 +174,13 @@ export async function convertPdf(
 // 相邻 item Y 差 ≤ lineSpacing → 同段落；否则新段落
 // ─────────────────────────────────────────────
 function buildParagraphs(
-  items: import('./domain/types.js').TextItem[],
+  items: TextItem[],
   baseFontSize: number,
-): Array<{ y: number; block: import('./domain/types.js').DocumentBlock }> {
+): Array<{ y: number; block: DocumentBlock }> {
   if (items.length === 0) return [];
 
   const lineSpacing = baseFontSize * 2.0;
-  const paragraphs: Array<{ y: number; block: import('./domain/types.js').DocumentBlock }> = [];
+  const paragraphs: Array<{ y: number; block: DocumentBlock }> = [];
   let currentLines: string[] = [];
   let currentY = items[0]!.y;
   let prevY = items[0]!.y;

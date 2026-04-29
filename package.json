@@ -1,5 +1,5 @@
 {
-  "name": "load-pdf",
+  "name": "pis-bmw",
   "version": "1.0.0",
   "description": "将 PDF 高保真还原为 Markdown，保留表格、标题、脚注、数学公式",
   "type": "module",
@@ -7,7 +7,13 @@
     "server": "tsx src/cli.ts",
     "dev": "tsx src/server.ts",
     "build": "tsup src/cli.ts src/server.ts --format esm --dts",
-    "convert": "tsx src/cli.ts"
+    "convert": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.config.e2e.ts",
+    "lint": "eslint src tests --max-warnings 0",
+    "lint:fix": "eslint src tests --fix"
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
@@ -18,9 +24,16 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.5.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.5"
   }
 }
